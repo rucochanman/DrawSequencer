@@ -1,18 +1,19 @@
 (
 s.waitForBoot({
     f = {
-        //sizes
-        var bins=512, len=500; //fft window size
+		//sizes
+		var bins=512, len=500; //fft window size		
 		var cw=len/16, m=(len-(13*cw))/6, hm=cw*2; //margin
 		var gx=0, gy=0, flag=false; //pixel status
 		//menu
 		var cols, colw, range, tex1, tex2, go, select, menu=0;
 		var p = PathName(thisProcess.nowExecutingPath).parentPath, path;
 		var col = Color.black, cleft=0, cright=0;
-        //functions
-        var setPixels, menuAction, reDraw;
-        var copyExe, delExe, moveExe, loadExe, saveExe, addExe, pstExe;
-        var copy_l, copy_r;
+		//functions
+		var setPixels, menuAction, reDraw;
+		var copyExe, delExe, moveExe, loadExe, saveExe, addExe, pstExe;
+		var copyPixels=[], copyPhases=[], copyMax=[];
+
 		//global
 		~spos=0; ~linepos=0;
 		~pixels=Array.fill([len,bins],{0});
@@ -126,13 +127,13 @@ s.waitForBoot({
 		.string_("GO")
 		.action_({
 			switch(menu,
-                1, { d.value; copyExe.value },
-                2, { d.value; delExe.value },
-                3, { d.value; moveExe.value },
-                4, { d.value; loadExe.value },
-                5, { d.value; saveExe.value },
-                6, { d.value; addExe.value },
-                7, { d.value; pstExe.value }
+                1, { copyExe.value },
+                2, { delExe.value },
+                3, { moveExe.value },
+                4, { loadExe.value },
+                5, { saveExe.value },
+                6, { addExe.value },
+                7, { pstExe.value }
 			);
 		});
 
@@ -220,8 +221,21 @@ s.waitForBoot({
 
 		//execution when GO pressed
 		copyExe = {
-			copy_l = cleft;
-			copy_r = cright;
+			//make blank array
+			var copyArray = (cleft..cright);
+			copyPixels = Array.fill([copyArray.size,bins],{0});
+			copyPhases = Array.fill([copyArray.size,bins],{0});
+			copyMax = Array.fill(copyArray.size,{10});
+			//set array
+			copyArray.do({|i|
+				~pixels[i].do({|item, j|
+					copyPixels[i][j] = item;
+				});
+				~phases[i].do({|item, j|
+					copyPhases[i][j] = item;
+				});
+				copyMax[i] = ~max[i];
+			});
 			reDraw.value;
 			~restart.value;
 		};
@@ -250,18 +264,18 @@ s.waitForBoot({
 				var diff = w - ~pixels.size;
 				diff.do({
 					~pixels = ~pixels.add(Array.fill(bins,{0}));
-                    ~phases = ~phases.add(Array.fill(bins,{0}));
-                    ~max = ~max.add(0);
+					~phases = ~phases.add(Array.fill(bins,{0}));
+					~max = ~max.add(0);
 				});
 			};
 			//set value
 			img.width.do({ |x|
 				img.height.do({ |y|
 					var px = img.getPixel(x, (bins-1)-y);
-                    var mag = Image.pixelToColor(px).red;
-                    var pha = Image.pixelToColor(px).blue;
-			        var max = Image.pixelToColor(px).green;
-			        mag = (mag + ~pixels[x+cright][y]).clip(0, 1.0);
+					var mag = Image.pixelToColor(px).red;
+					var pha = Image.pixelToColor(px).blue;    
+					var max = Image.pixelToColor(px).green;
+					mag = (mag + ~pixels[x+cright][y]).clip(0, 1.0);
 					~pixels[x+cright][y] = mag;
 					~phases[x+cright][y] = (pha*2pi)-pi;
 					(max==1).if{ ~max[x+cright] = y };
@@ -300,29 +314,32 @@ s.waitForBoot({
 		};
 
 		pstExe = {
-			var w = (copy_r - copy_l) + cleft;
 			//add buffer
+			var w = copyPixels.size + cleft;
 			(w > ~pixels.size).if{
 				var diff = w - ~pixels.size;
 				diff.do({
-					~pixels = ~pixels.add(Array.fill(bins,{0}));
-                    ~phases = ~phases.add(Array.fill(bins,{0}));
-                    ~max = ~max.add(0);
+					~pixels = ~pixels.add(Array.fill(bins,{0}));          
+					~phases = ~phases.add(Array.fill(bins,{0}));                    
+					~max = ~max.add(0);
 				});
 			};
 			//paste data
-			(copy_l..copy_r).do({|i|
-				~pixels[i].do({|item, j|
-					//(i==0).if{~pixels[i + cleft][j].postln};
-					~pixels[i+cleft][j] = (item + ~pixels[i+cleft][j]).clip(0.0, 1.0);
+			copyPixels.do({|bin, i|
+				bin.do({|item, j|
+					~pixels[i+cleft][j] =
+					(~pixels[i+cleft][j] + item).clip(0.0, 1.0);
 				});
-				~phases[i].do({|item, j|
-					~phases[i+cleft][j] = (item + ~phases[i+cleft][j]).clip(-2pi, 2pi);
-				});
-				~max[i+cleft] = ~max[i] + ~max[i + cleft];
 			});
-			copy_l = 0;
-			copy_r = 0;
+			copyPhases.do({|bin, i|
+				bin.do({|item, j|
+					~phases[i+cleft][j] =
+					(~phases[i+cleft][j] + item).clip(-2pi, 2pi);
+				});
+			});
+			copyMax.do({|item, i|
+				~max[i+cleft] = (~max[i+cleft] + item).clip(0, 512);
+			});
 			reDraw.value;
 			~restart.value;
 		};
@@ -334,49 +351,59 @@ s.waitForBoot({
 
 	//////////play sound//////////
 	~play = {
-		var bins=512, len= 500;
-		var cw=len/16, m=(len-(13*cw))/6, hm=cw*2; //margin
-		SynthDef(\ifft_draw, {
-			var mags = \mag.kr(1!512);
-			var phases = \phase.kr(1!512);
-			var chain, sig, count, windowStarts;
-			chain = FFT(LocalBuf(1024), FSinOsc.ar);
-			windowStarts = chain > -1;
-			count = Stepper.kr(windowStarts, 0, 0, ~pixels.size-1);
-			chain = PackFFT(chain, 512, [mags, phases].flop.flatten, 0, 512, 1);
-			sig = IFFT(chain) * \amp.kr(1);
-			Out.ar(0, sig.clip(-1, 1).dup);
-			SendTrig.kr(windowStarts, 0, count);
-		}).add;
-		OSCdef(\mf_set,{ arg msg;
-			var count = msg[3].asInteger;
-			var mag = ~pixels[count] * ~max[count];
-			~linepos = count;
-			h.set(\mag, mag, \phase, ~phases[count]);
-		},'/tr', s.addr);
-		//set routine
-		r = Routine({ arg appClockTime;
-			loop({
-				~line.bounds = Rect(m + ~linepos, hm, 1, bins);
-				0.1.wait;
-			})
-		});
-		//play start
-		AppClock.play(r);
-		OSCdef(\mf_set).enable;
-		h = Synth(\ifft_draw);
+		fork{
+			var bins=512, len=500;
+			var cw=len/16, m=(len-(13*cw))/6, hm=cw*2; //margin
+			SynthDef(\ifft_draw, {
+				var mags = \mag.kr(1!bins);
+				var phases = \phase.kr(1!bins);
+				var chain, sig, count, windowStarts;
+				chain = FFT(LocalBuf(1024), FSinOsc.ar);
+				windowStarts = chain > -1;
+				count = Stepper.kr(windowStarts, 0, 0, ~pixels.size-1);
+				chain = PackFFT(
+					chain, bins, [mags, phases].flop.flatten, 0, bins, 1);
+				sig = IFFT(chain);
+				Out.ar(0, sig.clip(-1, 1).dup);
+				SendTrig.kr(windowStarts, 0, count);
+			}).add;
+
+			OSCdef(\mf_set,{ arg msg;
+				var count = msg[3].asInteger;
+				var mag = ~pixels[count] * ~max[count];
+				~linepos = count;
+				h.set(\mag, mag, \phase, ~phases[count]);
+			},'/tr', s.addr);
+
+			//set routine
+			r = Routine({ arg appClockTime;
+				loop({
+					var pos = (m + ~linepos - ~spos).clip(m, m+len);
+					~line.bounds = Rect(pos, hm, 1, bins);
+					0.1.wait;
+				})
+			});
+			//play start
+			0.1.wait;
+			AppClock.play(r);
+			h = Synth(\ifft_draw);
+			OSCdef(\mf_set).enable;
+		};
 	};
 
 	~stop = {
-		h.free;
+		if(h.isNil, {s.freeAll}, {h.free});
 		AppClock.stop(r);
 		OSCdef(\mf_set).disable;
 	};
 
 	~restart = {
-		~play.value;
-		~stop.value;
-		~pbtn.value = 0;
+		fork{
+			~stop.value;
+			0.1.wait;
+			~play.value;
+		};
+		~pbtn.value = 1;
 	};
 
 	//////////execute///////////
