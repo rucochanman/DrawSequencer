@@ -63,17 +63,20 @@ xy選択時、テキストボックスにカーソルのxy座標が表示され�
 # import wav file
 音声ファイルをDrawSequencerで再生できる形式の画像に変換することができます。<br>
 <br>
-1)　変換したいwavファイルをwavフォルダ内に置く。<br>
+1)  変換したいwavファイルをwavフォルダ内に置く。<br>
 2)  drawSeqOp.scdを開き、`var wavFileName = "test"; //←change here`のファイル名（test）部分を読み込みたいwavファイル名に変更する。<br>
 3)  `//*****load execute No.1******`にカーソルを置き、実行する。（実行方法はdrawSeqMain.scdと同じ）<br>
 4)  `//*****execute No.2******`にカーソルを置き、実行する。SuperColliderのポストウィンドウ（画面右下の窓部分）にdoneと表示されるまで待つ。<br>
 5)  `var pngFileName = "test"; //←change here`に保存する画像ファイル名前を設定し、`//*****execute No.3******`にカーソルを置き、実行する。<br>
+6)  imageフォルダ内に画像データが保存される。
 <br>
 RGB情報を分けて画像ファイルを生成したい場合は、`//*****execute No.3******`の代わりに`//*****export img RGB******`を実行してください。<br>
 <br>
+
 # recording audio
 再生している音を録音する。<br>
-1)　`var fileName = "test"; //←change here`を変更し、録音するファイル名を設定する。<br>
+1)  `var fileName = "test"; //←change here`を変更し、録音するファイル名を設定する。<br>
 2)  `//*****recording start******`にカーソルを置き、実行する。<br>
 3)  録音を止めるには、`s.stopRecording;`にカーソルを置き、実行する。<br>
+4)  recordingsフォルダに録音データが保存される。
 
